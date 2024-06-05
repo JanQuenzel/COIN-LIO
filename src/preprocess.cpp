@@ -32,10 +32,16 @@ void Preprocess::ouster_handler(const sensor_msgs::PointCloud2::ConstPtr &msg, P
     added_pt.y = pl_orig.points[i].y;
     added_pt.z = pl_orig.points[i].z - lidar_sensor_z_offset;
 
-    if (reflectivity) {
-      added_pt.intensity = pl_orig.points[i].reflectivity;
-    } else {
-      added_pt.intensity = pl_orig.points[i].intensity;
+    if ( use_compensated ) // comp is written to intensity within [0,1]
+    {
+        added_pt.intensity = pl_orig.points[i].intensity * 255;
+    }
+    else {
+        if (reflectivity) {
+          added_pt.intensity = pl_orig.points[i].reflectivity;
+        } else {
+          added_pt.intensity = pl_orig.points[i].intensity;
+        }
     }
     
     // to keep track of original point index

@@ -6,7 +6,7 @@ preprocess:
     scan_line: 128
     blind: 0.65
     timestamp_unit: 3
-    use_compensated: false
+    use_compensated: true
 
 mapping:
     point_filter_num: 4
@@ -54,3 +54,4 @@ image:
     intensity_scale: 0.25
     window: [41, 7]
     masks: [0, 84, 70, 44, 953, 84, 70, 44]
+

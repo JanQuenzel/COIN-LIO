@@ -87,12 +87,16 @@ bool point_selected_surf[100000] = {0};
 bool lidar_pushed, flg_first_scan = true, flg_exit = false, flg_EKF_inited;
 bool scan_pub_en = false, scan_body_pub_en = false;
 double geo_std;
+std::shared_ptr<std::ofstream> posesFile = nullptr;
+int64_t lidar_ts_ns = 0;
+
 
 vector<BoxPointType> cub_needrm;
 vector<PointVector>  Nearest_Points;
 vector<double> extrinT(3, 0.0);
 vector<double> extrinR(9, 0.0);
 deque<double> time_buffer;
+deque<int64_t> time_buffer_ns;
 deque<PointCloudXYZI::Ptr> lidar_buffer;
 deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
 
@@ -246,6 +250,7 @@ void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg)
         ROS_ERROR("lidar loop back, clear buffer");
         lidar_buffer.clear();
         time_buffer.clear();
+        time_buffer_ns.clear();
     }
 
     PointCloudXYZI::Ptr  ptr(new PointCloudXYZI());
@@ -254,6 +259,7 @@ void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg)
     
     lidar_buffer.push_back(ptr);
     time_buffer.push_back(msg->header.stamp.toSec());
+    time_buffer_ns.push_back(msg->header.stamp.toNSec());
     last_timestamp_lidar = msg->header.stamp.toSec();
 }
 
@@ -297,11 +303,13 @@ bool sync_packages(MeasureGroup &meas)
         meas.lidar_beg_time = time_buffer.front();
         meas.lidar_end_time = meas.lidar_beg_time + meas.lidar->header.stamp * 1.e-9;
         lidar_end_time = meas.lidar_end_time;
+        lidar_ts_ns = time_buffer_ns.front();
         if (meas.lidar->points.size() <= 1) // time too little
         {
             ROS_WARN("Too few input point cloud!\n");
         }
 
+        //ROS_INFO_STREAM("beg: " << meas.lidar_beg_time << " end: " << meas.lidar_end_time << " d: " << (meas.lidar_end_time - meas.lidar_beg_time)<< " ns: " << lidar_ts_ns );
         lidar_pushed = true;
     }
     if (imu_buffer.back()->header.stamp.toSec() < lidar_end_time)
@@ -321,6 +329,7 @@ bool sync_packages(MeasureGroup &meas)
     }
     lidar_buffer.pop_front();
     time_buffer.pop_front();
+    time_buffer_ns.pop_front();
     lidar_pushed = false;
     return true;
 }
@@ -517,6 +526,15 @@ void publish_odometry(const ros::Publisher & pubOdomAftMapped)
     q.setZ(odomAftMapped.pose.pose.orientation.z);
     transform.setRotation( q );
     br.sendTransform( tf::StampedTransform( transform, odomAftMapped.header.stamp, "camera_init", "body" ) );
+    {
+        // write to file:
+        if ( ! posesFile ) posesFile = std::make_shared<std::ofstream>("./coin_lio_after_map_poses.txt");
+        if( posesFile && posesFile->is_open() )
+        {
+             (*posesFile) << (lidar_ts_ns) << " " << transform.getOrigin().x() << " " << transform.getOrigin().y() << " " << transform.getOrigin().z()
+                          << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << std::endl;
+        }
+    }
 }
 
 void publish_path(const ros::Publisher pubPath)
@@ -968,6 +986,7 @@ int main(int argc, char** argv)
     // Preprocess Params
     nh.param<int>("preprocess/lidar_type", p_pre->lidar_type, OUSTER);
     nh.param<double>("preprocess/blind", p_pre->blind, 0.01);
+    nh.param<bool>("preprocess/use_compensated", p_pre->use_compensated, false);
     std::vector<double> lidar_to_sensor;
     bool transform_found = nh.getParam("/lidar_to_sensor_transform", lidar_to_sensor) ||
         nh.getParam("/lidar_intrinsics/lidar_to_sensor_transform", lidar_to_sensor);

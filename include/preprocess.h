@@ -52,6 +52,7 @@ class Preprocess
   double blind;
   double lidar_sensor_z_offset;
   bool reflectivity;
+  bool use_compensated;
 
   private:
   void ouster_handler(const sensor_msgs::PointCloud2::ConstPtr &msg, PointCloudXYZI::Ptr &pcl_out);
