@@ -76,7 +76,7 @@ void ImageProcessor::createImages(LidarFrame& frame) {
 
     if (remove_lines_) {
         removeLines(frame.img_intensity);
-    }  
+    }
 
     if (brightness_filter_) {
         filterBrightness(frame.img_intensity);
